@@ -1,6 +1,20 @@
-const STORAGE_KEY = "modHeaderLiteConfig";
-const MAX_DYNAMIC_RULES = 500;
-const DEFAULT_INITIATOR_DOMAINS = ["localhost", "127.0.0.1"];
+import {
+  DEFAULT_SETTINGS,
+  SETTINGS_KEY,
+  STORAGE_KEY,
+  buildRules,
+  countEnabledRulesForTab,
+  normalizeSettings,
+  summarizeRule,
+} from "./core.js";
+
+/**
+ * @typedef {import("./core.js").ExtensionConfig} ExtensionConfig
+ */
+
+/**
+ * @typedef {import("./core.js").StorageSettings} StorageSettings
+ */
 
 console.log("[Dev Server Debug Headers] service worker loaded");
 
@@ -16,11 +30,11 @@ chrome.runtime.onStartup.addListener(() => {
   updateBadgeForActiveTab("onStartup");
 });
 chrome.storage.onChanged.addListener((changes, areaName) => {
-  if (areaName === "local" && changes[STORAGE_KEY]) {
-    console.log(
-      "[Dev Server Debug Headers] storage changed",
-      changes[STORAGE_KEY],
-    );
+  if (
+    ["local", "sync"].includes(areaName) &&
+    (changes[STORAGE_KEY] || changes[SETTINGS_KEY])
+  ) {
+    console.log("[Dev Server Debug Headers] storage changed", changes);
     syncRules("storage.onChanged");
     updateBadgeForActiveTab("storage.onChanged");
   }
@@ -39,6 +53,10 @@ chrome.windows.onFocusChanged.addListener((windowId) => {
   }
 });
 
+/**
+ * @param {string} reason
+ * @returns {Promise<void>}
+ */
 async function syncRules(reason) {
   console.log("[Dev Server Debug Headers] syncRules:start", { reason });
 
@@ -74,151 +92,36 @@ async function syncRules(reason) {
   }
 }
 
+/**
+ * @returns {Promise<ExtensionConfig>}
+ */
 async function getConfig() {
-  const result = await chrome.storage.local.get(STORAGE_KEY);
+  const settings = await getSettings();
+  const result = await chrome.storage[settings.storageArea].get(STORAGE_KEY);
   const config = {
     enabled: true,
     entries: [],
     ...result[STORAGE_KEY],
   };
 
-  console.log("[Dev Server Debug Headers] getConfig", config);
+  console.log("[Dev Server Debug Headers] getConfig", {
+    storageArea: settings.storageArea,
+    config,
+  });
 
   return config;
 }
 
-function buildRules(config) {
-  if (!config.enabled || !Array.isArray(config.entries)) {
-    console.log("[Dev Server Debug Headers] buildRules:disabled-or-invalid", {
-      enabled: config.enabled,
-      entriesIsArray: Array.isArray(config.entries),
-    });
-    return [];
-  }
+/**
+ * @returns {Promise<StorageSettings>}
+ */
+async function getSettings() {
+  const syncResult = await chrome.storage.sync.get(SETTINGS_KEY);
+  const localResult = await chrome.storage.local.get(SETTINGS_KEY);
+  const settings =
+    syncResult[SETTINGS_KEY] || localResult[SETTINGS_KEY] || DEFAULT_SETTINGS;
 
-  const usableEntries = config.entries.filter((entry, index) =>
-    isUsableEntry(entry, index),
-  );
-
-  if (config.entries.length > MAX_DYNAMIC_RULES) {
-    console.warn("[Dev Server Debug Headers] buildRules:truncated", {
-      configuredEntries: config.entries.length,
-      maxDynamicRules: MAX_DYNAMIC_RULES,
-    });
-  }
-
-  const rules = usableEntries
-    .slice(0, MAX_DYNAMIC_RULES)
-    .map((entry, index) => ({
-      id: index + 1,
-      priority: 1,
-      action: {
-        type: "modifyHeaders",
-        requestHeaders: [buildHeaderOperation(entry)],
-      },
-      condition: buildCondition(entry),
-    }));
-
-  console.log("[Dev Server Debug Headers] buildRules:built", {
-    usableEntries: usableEntries.length,
-    rules: rules.map(summarizeRule),
-  });
-
-  return rules;
-}
-
-function buildHeaderOperation(entry) {
-  const operation = {
-    header: entry.headerName.trim(),
-    operation: entry.operation,
-  };
-
-  if (entry.operation !== "remove") {
-    operation.value = entry.headerValue;
-  }
-
-  return operation;
-}
-
-function isUsableEntry(entry, index) {
-  if (!entry || entry.enabled === false) {
-    console.log("[Dev Server Debug Headers] entry skipped:disabled", {
-      index,
-      entry,
-    });
-    return false;
-  }
-
-  const operation = entry.operation || "set";
-  if (!["set", "append", "remove"].includes(operation)) {
-    console.warn("[Dev Server Debug Headers] entry skipped:invalid operation", {
-      index,
-      operation,
-      entry,
-    });
-    return false;
-  }
-
-  if (!entry.headerName?.trim()) {
-    console.warn(
-      "[Dev Server Debug Headers] entry skipped:missing headerName",
-      {
-        index,
-        entry,
-      },
-    );
-    return false;
-  }
-
-  return true;
-}
-
-function buildCondition(entry) {
-  const urlContains = entry.urlContains?.trim();
-  const initiatorDomains = normalizeInitiatorDomains(entry.initiatorDomains);
-  const methods = Array.isArray(entry.methods)
-    ? entry.methods.filter(Boolean)
-    : [];
-  const resourceTypes = Array.isArray(entry.resourceTypes)
-    ? entry.resourceTypes.filter(Boolean)
-    : [];
-
-  return {
-    regexFilter: buildRegexFilter(urlContains),
-    ...(initiatorDomains.length > 0 ? { initiatorDomains } : {}),
-    ...(methods.length > 0 ? { requestMethods: methods } : {}),
-    ...(resourceTypes.length > 0 ? { resourceTypes } : {}),
-  };
-}
-
-function normalizeInitiatorDomains(initiatorDomains) {
-  if (!Array.isArray(initiatorDomains)) {
-    return DEFAULT_INITIATOR_DOMAINS;
-  }
-
-  return initiatorDomains
-    .map(normalizeDomain)
-    .filter(Boolean)
-    .filter((domain, index, domains) => domains.indexOf(domain) === index);
-}
-
-function normalizeDomain(domain) {
-  return String(domain)
-    .trim()
-    .replace(/^https?:\/\//i, "")
-    .replace(/^wss?:\/\//i, "")
-    .replace(/\/.*$/, "")
-    .replace(/:\d+$/, "")
-    .toLowerCase();
-}
-
-function buildRegexFilter(urlContains) {
-  const escapedNeedle = urlContains ? escapeRegex(urlContains) : "";
-  return `^(https?|wss?)://.*${escapedNeedle}`;
-}
-
-function escapeRegex(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return normalizeSettings(settings);
 }
 
 async function updateBadgeForActiveTab(reason) {
@@ -275,56 +178,4 @@ async function updateBadgeForTab(tabId, reason, knownTab) {
       error,
     });
   }
-}
-
-function countEnabledRulesForTab(config, tabUrl) {
-  const tabDomain = getTabDomain(tabUrl);
-  if (!config.enabled || !Array.isArray(config.entries) || !tabDomain) {
-    return 0;
-  }
-
-  return config.entries.filter((entry) =>
-    isEnabledRuleForDomain(entry, tabDomain),
-  ).length;
-}
-
-function getTabDomain(tabUrl) {
-  try {
-    const url = new URL(tabUrl);
-    return ["http:", "https:"].includes(url.protocol)
-      ? url.hostname.toLowerCase()
-      : "";
-  } catch {
-    return "";
-  }
-}
-
-function isEnabledRuleForDomain(entry, tabDomain) {
-  if (!entry || entry.enabled === false || !entry.headerName?.trim()) {
-    return false;
-  }
-
-  const operation = entry.operation || "set";
-  if (!["set", "append", "remove"].includes(operation)) {
-    return false;
-  }
-
-  return normalizeInitiatorDomains(entry.initiatorDomains).some((domain) =>
-    domainMatches(tabDomain, domain),
-  );
-}
-
-function domainMatches(tabDomain, ruleDomain) {
-  return tabDomain === ruleDomain || tabDomain.endsWith(`.${ruleDomain}`);
-}
-
-function summarizeRule(rule) {
-  return {
-    id: rule.id,
-    requestHeaders: rule.action.requestHeaders,
-    regexFilter: rule.condition.regexFilter,
-    initiatorDomains: rule.condition.initiatorDomains,
-    requestMethods: rule.condition.requestMethods,
-    resourceTypes: rule.condition.resourceTypes,
-  };
 }

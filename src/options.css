@@ -7,6 +7,8 @@
   --border: #d8dee8;
   --accent: #176b87;
   --accent-strong: #0f5268;
+  --link: #0b63ce;
+  --link-hover: #084c9d;
   --danger: #9f1d1d;
   --danger-bg: #9f1d1d;
   --danger-bg-hover: #7f1717;
@@ -68,6 +70,31 @@ fieldset {
   gap: 8px;
 }
 
+.editor-title {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.editor-title span {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-style: italic;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: flex-start;
+  gap: 14px;
+}
+
 .panel-actions input {
   display: none;
 }
@@ -88,7 +115,6 @@ h2 {
 }
 
 p,
-.meta,
 .empty {
   color: var(--muted);
 }
@@ -120,11 +146,54 @@ p,
   overflow: auto;
 }
 
+.rules-panel[aria-disabled="true"] .rules,
+.rules-panel[aria-disabled="true"] .rule-group-header,
+.rules-panel[aria-disabled="true"] .panel-actions {
+  opacity: 0.55;
+}
+
+.rules-panel[aria-disabled="true"],
+.rules-panel[aria-disabled="true"] button,
+.rules-panel[aria-disabled="true"] input,
+.rules-panel[aria-disabled="true"] .rule-title,
+.rules-panel[aria-disabled="true"] .rule-enabled-toggle {
+  cursor: not-allowed;
+}
+
+.rules-panel[aria-disabled="true"] .rule-title:hover {
+  color: var(--link);
+}
+
+.rules-panel[aria-disabled="true"] button.danger-icon:hover {
+  border-color: transparent;
+  background: transparent;
+}
+
 .switch {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   font-weight: 600;
+  white-space: nowrap;
+}
+
+.switch input {
+  width: 16px;
+  min-height: 16px;
+  flex: 0 0 16px;
+  margin: 0;
+  padding: 0;
+}
+
+.sync-option {
+  display: grid;
+  gap: 2px;
+}
+
+.sync-option p {
+  max-width: 180px;
+  font-size: 11px;
+  line-height: 1.25;
 }
 
 .grid {
@@ -250,8 +319,8 @@ button.icon-button {
 }
 
 button.icon-button svg {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -341,10 +410,12 @@ fieldset input {
 
 .rule-row {
   display: grid;
-  align-items: start;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
   justify-content: stretch;
-  gap: 10px;
-  padding: 12px;
+  column-gap: 10px;
+  min-height: 48px;
+  padding: 8px 10px;
   border: 1px solid var(--border);
   border-radius: 8px;
 }
@@ -355,26 +426,85 @@ fieldset input {
 
 .rule-main {
   display: grid;
-  gap: 4px;
   min-width: 0;
 }
 
 .rule-title {
+  min-height: 0;
+  width: fit-content;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--link);
   font-weight: 700;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  white-space: nowrap;
   overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.meta {
-  overflow-wrap: anywhere;
+.rule-title:hover {
+  color: var(--link-hover);
+}
+
+.rule-title:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  outline-offset: 3px;
+}
+
+.edit-ghost {
+  position: fixed;
+  z-index: 20;
+  overflow: hidden;
+  padding: 0 2px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  color: var(--link);
+  font-weight: 700;
+  pointer-events: none;
+  text-decoration: underline;
+  text-overflow: ellipsis;
+  text-underline-offset: 3px;
+  white-space: nowrap;
 }
 
 .rule-controls {
   display: flex;
+  align-items: center;
   gap: 8px;
+}
+
+.rule-enabled-toggle {
+  display: inline-grid;
+  width: 24px;
+  min-height: 24px;
+  place-items: center;
+}
+
+.rule-enabled-toggle input {
+  width: 18px;
+  min-height: 18px;
+  margin: 0;
+  padding: 0;
 }
 
 .rule-controls button {
   flex: 0 0 auto;
+}
+
+button.danger-icon {
+  border-color: transparent;
+  background: transparent;
+  color: var(--danger);
+}
+
+button.danger-icon:hover {
+  border-color: color-mix(in srgb, var(--danger) 35%, transparent);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
 }
 
 .empty {
@@ -390,6 +520,8 @@ fieldset input {
     --border: #35404f;
     --accent: #2b8ead;
     --accent-strong: #47a8c7;
+    --link: #8ab4f8;
+    --link-hover: #aecbfa;
     --danger: #ff8a8a;
     --danger-bg: #ffd7d7;
     --danger-bg-hover: #ffbcbc;

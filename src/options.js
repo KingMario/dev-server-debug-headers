@@ -1,12 +1,34 @@
-const STORAGE_KEY = "modHeaderLiteConfig";
-const DEFAULT_CONFIG = {
-  enabled: true,
-  entries: [],
-};
-const DEFAULT_INITIATOR_DOMAINS = ["localhost", "127.0.0.1"];
+import {
+  DEFAULT_CONFIG,
+  DEFAULT_INITIATOR_DOMAINS,
+  DEFAULT_SETTINGS,
+  SETTINGS_KEY,
+  STORAGE_KEY,
+  createRuleTitle,
+  findRuleTitleElementById,
+  groupEntriesByInitiatorDomains,
+  normalizeImportedConfig,
+  normalizeInitiatorDomains,
+  normalizeSettings,
+  parseDomainList,
+  switchStorageArea,
+} from "./core.js";
+
+/**
+ * @typedef {import("./core.js").RuleEntry} RuleEntry
+ */
+
+/**
+ * @typedef {import("./core.js").ExtensionConfig} ExtensionConfig
+ */
+
+/**
+ * @typedef {import("./core.js").StorageSettings} StorageSettings
+ */
 
 const elements = {
   enabled: document.querySelector("#enabled"),
+  syncEnabled: document.querySelector("#sync-enabled"),
   form: document.querySelector("#rule-form"),
   editingId: document.querySelector("#editing-id"),
   urlContains: document.querySelector("#url-contains"),
@@ -20,8 +42,11 @@ const elements = {
   initiatorDomainInput: document.querySelector("#initiator-domain-input"),
   methodsFieldset: document.querySelector("#methods-fieldset"),
   methodAll: document.querySelector("#method-all"),
+  ruleFormTitle: document.querySelector("#rule-form-title"),
+  editingRuleTitle: document.querySelector("#editing-rule-title"),
   saveRule: document.querySelector("#save-rule"),
   cancelEdit: document.querySelector("#cancel-edit"),
+  rulesPanel: document.querySelector(".rules-panel"),
   rules: document.querySelector("#rules"),
   emptyState: document.querySelector("#empty-state"),
   import: document.querySelector("#import"),
@@ -29,16 +54,51 @@ const elements = {
   export: document.querySelector("#export"),
 };
 
-let config = await loadConfig();
+/** @type {StorageSettings} */
+let settings = await loadSettings();
+/** @type {ExtensionConfig} */
+let config = await loadConfig(settings.storageArea);
 let currentInitiatorDomains = [];
+let editingRuleTitleToken = 0;
 initializeIconButtons();
 resetForm();
 render();
 
 elements.enabled.addEventListener("change", async () => {
+  const previousConfig = cloneConfig(config);
   config.enabled = elements.enabled.checked;
-  await saveConfig();
+  try {
+    await saveConfig();
+  } catch (error) {
+    console.error("[Dev Server Debug Headers] save failed", error);
+    config = previousConfig;
+    alert(`Failed to update status: ${error.message}`);
+  }
   render();
+});
+
+elements.syncEnabled.addEventListener("change", async () => {
+  const targetStorageArea = elements.syncEnabled.checked ? "sync" : "local";
+  const previousStorageArea = settings.storageArea;
+  const previousConfig = cloneConfig(config);
+
+  try {
+    const loadResult = await switchStorageArea(targetStorageArea, config, {
+      loadConfig: loadStoredConfig,
+      saveConfig,
+      saveSettings,
+    });
+    settings = loadResult.settings;
+    config = loadResult.config;
+    render();
+  } catch (error) {
+    console.error("[Dev Server Debug Headers] switch storage failed", error);
+    settings = { storageArea: previousStorageArea };
+    elements.syncEnabled.checked = previousStorageArea === "sync";
+    config = previousConfig;
+    alert(`Failed to switch storage: ${error.message}`);
+    render();
+  }
 });
 
 elements.operation.addEventListener("change", () => {
@@ -109,6 +169,8 @@ elements.importFile.addEventListener("change", async () => {
     return;
   }
 
+  const previousConfig = cloneConfig(config);
+
   try {
     const importedConfig = normalizeImportedConfig(
       JSON.parse(await file.text()),
@@ -120,6 +182,8 @@ elements.importFile.addEventListener("change", async () => {
     flashButtonTitle(elements.import, "Imported", "Import JSON");
   } catch (error) {
     console.error("[Dev Server Debug Headers] import failed", error);
+    config = previousConfig;
+    render();
     flashButtonTitle(elements.import, "Invalid JSON", "Import JSON");
   }
 });
@@ -128,24 +192,65 @@ elements.form.addEventListener("submit", async (event) => {
   event.preventDefault();
   const entry = readEntryFromForm();
   const editingId = elements.editingId.value;
+  const savedId = editingId || crypto.randomUUID();
+  const nextRuleTitle = createRuleTitle(entry);
+  const saveGhostSource = captureSaveGhostSource(nextRuleTitle);
+
+  const previousConfig = cloneConfig(config);
 
   if (editingId) {
     config.entries = config.entries.map((item) =>
       item.id === editingId ? { ...item, ...entry } : item,
     );
   } else {
-    config.entries = [
-      { id: crypto.randomUUID(), enabled: true, ...entry },
-    ].concat(config.entries);
+    config.entries = [{ id: savedId, enabled: true, ...entry }].concat(
+      config.entries,
+    );
   }
 
-  await saveConfig();
+  try {
+    await saveConfig();
+  } catch (error) {
+    console.error("[Dev Server Debug Headers] save failed", error);
+    config = previousConfig;
+    alert(`Failed to save rule: ${error.message}`);
+    render();
+    return;
+  }
   resetForm();
   render();
+  animateRuleSaveGhost(saveGhostSource, savedId);
 });
 
-async function loadConfig() {
-  const result = await chrome.storage.local.get(STORAGE_KEY);
+/**
+ * @returns {Promise<StorageSettings>}
+ */
+async function loadSettings() {
+  const syncResult = await chrome.storage.sync.get(SETTINGS_KEY);
+  const localResult = await chrome.storage.local.get(SETTINGS_KEY);
+  const loadedSettings =
+    syncResult[SETTINGS_KEY] || localResult[SETTINGS_KEY] || DEFAULT_SETTINGS;
+
+  return normalizeSettings(loadedSettings);
+}
+
+/**
+ * @param {StorageSettings} nextSettings
+ * @returns {Promise<void>}
+ */
+async function saveSettings(nextSettings) {
+  await Promise.all([
+    chrome.storage.local.set({ [SETTINGS_KEY]: nextSettings }),
+    chrome.storage.sync.set({ [SETTINGS_KEY]: nextSettings }),
+  ]);
+}
+
+/**
+ * @param {"local" | "sync"} storageArea
+ * @returns {Promise<ExtensionConfig>}
+ */
+async function loadConfig(storageArea) {
+  const result = await chrome.storage[storageArea].get(STORAGE_KEY);
   return {
     ...DEFAULT_CONFIG,
     ...result[STORAGE_KEY],
@@ -153,78 +258,53 @@ async function loadConfig() {
   };
 }
 
-async function saveConfig() {
-  await chrome.storage.local.set({ [STORAGE_KEY]: config });
-}
-
-function normalizeImportedConfig(importedConfig) {
-  if (!importedConfig || !Array.isArray(importedConfig.entries)) {
-    throw new Error("Imported config must contain an entries array.");
-  }
-
+/**
+ * @param {"local" | "sync"} storageArea
+ * @returns {Promise<{ exists: boolean, config: ExtensionConfig }>}
+ */
+async function loadStoredConfig(storageArea) {
+  const result = await chrome.storage[storageArea].get(STORAGE_KEY);
   return {
-    enabled: importedConfig.enabled !== false,
-    entries: importedConfig.entries.map(normalizeImportedEntry),
+    exists: Boolean(result[STORAGE_KEY]),
+    config: {
+      ...DEFAULT_CONFIG,
+      ...result[STORAGE_KEY],
+      entries: result[STORAGE_KEY]?.entries || [],
+    },
   };
 }
 
-function normalizeImportedEntry(entry) {
-  const operation = ["set", "append", "remove"].includes(entry?.operation)
-    ? entry.operation
-    : "set";
+/**
+ * @param {"local" | "sync"} [storageArea]
+ * @param {ExtensionConfig} [nextConfig]
+ * @returns {Promise<void>}
+ */
+async function saveConfig(
+  storageArea = settings.storageArea,
+  nextConfig = config,
+) {
+  await chrome.storage[storageArea].set({ [STORAGE_KEY]: nextConfig });
+}
 
-  return {
-    id: entry?.id || crypto.randomUUID(),
-    enabled: entry?.enabled !== false,
-    urlContains: String(entry?.urlContains || "").trim(),
-    headerName: String(entry?.headerName || "")
-      .trim()
-      .toLowerCase(),
-    headerValue: operation === "remove" ? "" : String(entry?.headerValue || ""),
-    operation,
-    methods: Array.isArray(entry?.methods) ? entry.methods.filter(Boolean) : [],
-    resourceTypes: Array.isArray(entry?.resourceTypes)
-      ? entry.resourceTypes.filter(Boolean)
-      : [],
-    initiatorDomains: normalizeInitiatorDomains(entry?.initiatorDomains),
-  };
+/**
+ * @param {ExtensionConfig} value
+ * @returns {ExtensionConfig}
+ */
+function cloneConfig(value) {
+  return JSON.parse(JSON.stringify(value));
 }
 
 function render() {
   elements.enabled.checked = config.enabled;
+  elements.syncEnabled.checked = settings.storageArea === "sync";
   elements.rules.innerHTML = "";
   elements.emptyState.hidden = config.entries.length > 0;
 
   for (const group of groupEntriesByInitiatorDomains(config.entries)) {
     elements.rules.append(createRuleGroup(group));
   }
-}
 
-function groupEntriesByInitiatorDomains(entries) {
-  const groupsByKey = new Map();
-  const defaultKey = DEFAULT_INITIATOR_DOMAINS.join(", ");
-  groupsByKey.set(defaultKey, {
-    key: defaultKey,
-    domains: DEFAULT_INITIATOR_DOMAINS,
-    entries: [],
-  });
-
-  for (const entry of entries) {
-    const domains = normalizeInitiatorDomains(entry.initiatorDomains);
-    const key = domains.join(", ");
-
-    if (!groupsByKey.has(key)) {
-      groupsByKey.set(key, {
-        key,
-        domains,
-        entries: [],
-      });
-    }
-
-    groupsByKey.get(key).entries.push(entry);
-  }
-
-  return Array.from(groupsByKey.values());
+  syncRulesPanelDisabledState();
 }
 
 function createRuleGroup(group) {
@@ -263,6 +343,7 @@ function startNewRuleForDomains(domains) {
 }
 
 function createRuleRow(entry) {
+  const ruleTitle = createRuleTitle(entry);
   const row = document.createElement("li");
   row.className = "rule-row";
   row.setAttribute("aria-disabled", String(entry.enabled === false));
@@ -270,9 +351,17 @@ function createRuleRow(entry) {
   const main = document.createElement("div");
   main.className = "rule-main";
 
-  const title = document.createElement("div");
+  const title = document.createElement("button");
+  title.type = "button";
   title.className = "rule-title";
-  title.textContent = `${entry.operation.toUpperCase()} ${entry.headerName}`;
+  title.dataset.ruleId = entry.id;
+  title.textContent = ruleTitle;
+  title.setAttribute("aria-label", `Edit rule ${ruleTitle}`);
+  title.addEventListener("click", () => {
+    const titleToken = startEditingRuleTitleTransition();
+    animateRuleEditGhost(title, ruleTitle, titleToken);
+    editEntry(entry);
+  });
 
   main.append(title);
 
@@ -280,21 +369,43 @@ function createRuleRow(entry) {
   controls.className = "rule-controls";
   controls.append(
     createIconButton(
-      entry.enabled === false ? "Enable" : "Disable",
-      entry.enabled === false ? "play" : "pause",
-      () => toggleEntry(entry.id),
+      `Delete rule ${ruleTitle}`,
+      "x",
+      () => deleteEntry(entry.id),
+      "danger-icon",
     ),
-    createIconButton("Edit", "edit", () => editEntry(entry)),
-    createIconButton("Delete", "trash", () => deleteEntry(entry.id), "danger"),
   );
 
-  row.append(main, controls);
+  row.append(createRuleEnabledToggle(entry, ruleTitle), main, controls);
   return row;
 }
 
+function createRuleEnabledToggle(entry, ruleTitle) {
+  const label = document.createElement("label");
+  label.className = "rule-enabled-toggle";
+  label.title =
+    entry.enabled === false
+      ? `Enable rule ${ruleTitle}`
+      : `Disable rule ${ruleTitle}`;
+
+  const input = document.createElement("input");
+  input.type = "checkbox";
+  input.checked = entry.enabled !== false;
+  input.setAttribute(
+    "aria-label",
+    entry.enabled === false
+      ? `Enable rule ${ruleTitle}`
+      : `Disable rule ${ruleTitle}`,
+  );
+  input.addEventListener("change", () => toggleEntry(entry.id));
+
+  label.append(input);
+  return label;
+}
+
 function initializeIconButtons() {
-  setIconButton(elements.saveRule, "Save rule", "check");
-  setIconButton(elements.cancelEdit, "Cancel edit", "x");
+  setIconButton(elements.saveRule, "Save rule", "save");
+  setIconButton(elements.cancelEdit, "Cancel edit", "undo");
   setIconButton(elements.import, "Import JSON", "upload");
   setIconButton(elements.export, "Export JSON", "download");
 }
@@ -322,17 +433,194 @@ function flashButtonTitle(button, text, fallbackText) {
   }, 1200);
 }
 
+/**
+ * @param {string} fallbackRuleTitle
+ * @returns {{ left: number, top: number, width: number, text: string }}
+ */
+function captureSaveGhostSource(fallbackRuleTitle) {
+  const sourceElement = elements.editingRuleTitle.hidden
+    ? elements.ruleFormTitle
+    : elements.editingRuleTitle;
+  const sourceRect = sourceElement.getBoundingClientRect();
+
+  return {
+    left: sourceRect.left,
+    top: sourceRect.top,
+    width: sourceRect.width,
+    text: fallbackRuleTitle,
+  };
+}
+
+/**
+ * @param {HTMLElement} sourceElement
+ * @param {string} ruleTitle
+ * @param {number} titleToken
+ * @returns {Promise<void>}
+ */
+async function animateRuleEditGhost(sourceElement, ruleTitle, titleToken) {
+  if (globalThis.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    showEditingRuleTitle(ruleTitle, titleToken);
+    return;
+  }
+
+  const sourceRect = sourceElement.getBoundingClientRect();
+  const targetRect = getEditingRuleTitleTargetRect();
+  const ghost = document.createElement("div");
+
+  ghost.className = "edit-ghost";
+  ghost.textContent = sourceElement.textContent;
+  ghost.setAttribute("aria-hidden", "true");
+  ghost.style.left = `${sourceRect.left}px`;
+  ghost.style.top = `${sourceRect.top}px`;
+  ghost.style.width = `${sourceRect.width}px`;
+  document.body.append(ghost);
+
+  try {
+    const animation = ghost.animate(
+      [
+        {
+          opacity: 0.95,
+          transform: "translate3d(0, 0, 0) scale(1)",
+        },
+        {
+          opacity: 0.72,
+          transform: `translate3d(${targetRect.left - sourceRect.left}px, ${
+            targetRect.top - sourceRect.top
+          }px, 0) scale(0.86)`,
+        },
+      ],
+      {
+        duration: 260,
+        easing: "cubic-bezier(0.2, 0.8, 0.2, 1)",
+      },
+    );
+
+    await animation.finished;
+    showEditingRuleTitle(ruleTitle, titleToken);
+  } catch (_error) {
+    // A canceled animation should only remove the transient ghost.
+  } finally {
+    ghost.remove();
+  }
+}
+
+/**
+ * @returns {{ left: number, top: number }}
+ */
+function getEditingRuleTitleTargetRect() {
+  const titleRect = elements.ruleFormTitle.getBoundingClientRect();
+  const titleStyles = globalThis.getComputedStyle(
+    elements.ruleFormTitle.parentElement,
+  );
+  const titleGap = Number.parseFloat(titleStyles.columnGap || titleStyles.gap);
+
+  return {
+    left: titleRect.right + (Number.isNaN(titleGap) ? 8 : titleGap),
+    top: titleRect.top,
+  };
+}
+
+/**
+ * @param {{ left: number, top: number, width: number, text: string }} source
+ * @param {string} targetRuleId
+ * @returns {Promise<void>}
+ */
+async function animateRuleSaveGhost(source, targetRuleId) {
+  if (globalThis.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    return;
+  }
+
+  const targetElement = findRuleTitleElement(targetRuleId);
+  if (!targetElement) {
+    return;
+  }
+
+  const targetRect = targetElement.getBoundingClientRect();
+  const ghost = document.createElement("div");
+
+  ghost.className = "edit-ghost";
+  ghost.textContent = source.text;
+  ghost.setAttribute("aria-hidden", "true");
+  ghost.style.left = `${source.left}px`;
+  ghost.style.top = `${source.top}px`;
+  ghost.style.width = `${Math.max(source.width, targetRect.width)}px`;
+  document.body.append(ghost);
+
+  try {
+    const animation = ghost.animate(
+      [
+        {
+          opacity: 0.9,
+          transform: "translate3d(0, 0, 0) scale(0.86)",
+        },
+        {
+          opacity: 0.72,
+          transform: `translate3d(${targetRect.left - source.left}px, ${
+            targetRect.top - source.top
+          }px, 0) scale(1)`,
+        },
+      ],
+      {
+        duration: 240,
+        easing: "cubic-bezier(0.2, 0.8, 0.2, 1)",
+      },
+    );
+
+    await animation.finished;
+  } catch (_error) {
+    // A canceled animation should only remove the transient ghost.
+  } finally {
+    ghost.remove();
+  }
+}
+
+/**
+ * @param {string} ruleId
+ * @returns {HTMLElement | null}
+ */
+function findRuleTitleElement(ruleId) {
+  return findRuleTitleElementById(
+    Array.from(document.querySelectorAll(".rule-title")),
+    ruleId,
+  );
+}
+
+/**
+ * @returns {number}
+ */
+function startEditingRuleTitleTransition() {
+  editingRuleTitleToken += 1;
+  clearEditingRuleTitle();
+  return editingRuleTitleToken;
+}
+
+/**
+ * @param {string} ruleTitle
+ * @param {number} titleToken
+ * @returns {void}
+ */
+function showEditingRuleTitle(ruleTitle, titleToken) {
+  if (titleToken !== editingRuleTitleToken) {
+    return;
+  }
+
+  elements.editingRuleTitle.textContent = ruleTitle;
+  elements.editingRuleTitle.hidden = false;
+}
+
+function clearEditingRuleTitle() {
+  editingRuleTitleToken += 1;
+  elements.editingRuleTitle.textContent = "";
+  elements.editingRuleTitle.hidden = true;
+}
+
 function getIconSvg(name) {
   const icons = {
-    check: '<path d="M20 6 9 17l-5-5" />',
     download:
       '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="M7 10l5 5 5-5" /><path d="M12 15V3" />',
-    edit: '<path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />',
-    pause: '<path d="M8 5v14" /><path d="M16 5v14" />',
-    play: '<path d="m8 5 11 7-11 7Z" />',
     plus: '<path d="M12 5v14" /><path d="M5 12h14" />',
-    trash:
-      '<path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v5" /><path d="M14 11v5" />',
+    save: '<path d="M4 4h13l3 3v13H4Z" /><path d="M7 4v6h10V4" /><path d="M8 20v-7h8v7" /><path d="M14 6h2" />',
+    undo: '<path d="M8 7H4V3" /><path d="M4.6 7A8 8 0 1 1 6 18" />',
     upload:
       '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="M17 8l-5-5-5 5" /><path d="M12 3v12" />',
     x: '<path d="M18 6 6 18" /><path d="m6 6 12 12" />',
@@ -379,6 +667,7 @@ function editEntry(entry) {
   syncMethodAllState();
   elements.cancelEdit.hidden = false;
   elements.headerValue.disabled = entry.operation === "remove";
+  syncRulesPanelDisabledState();
 }
 
 function readEntryFromForm() {
@@ -399,11 +688,24 @@ function readEntryFromForm() {
 function resetForm() {
   elements.form.reset();
   elements.editingId.value = "";
+  clearEditingRuleTitle();
   elements.operation.value = "set";
   setInitiatorDomains(DEFAULT_INITIATOR_DOMAINS);
   elements.methodAll.checked = true;
   elements.cancelEdit.hidden = true;
   elements.headerValue.disabled = false;
+  syncRulesPanelDisabledState();
+}
+
+function syncRulesPanelDisabledState() {
+  const isEditing = Boolean(elements.editingId.value);
+  elements.rulesPanel.setAttribute("aria-disabled", String(isEditing));
+
+  for (const control of elements.rulesPanel.querySelectorAll(
+    "button, input, select, textarea",
+  )) {
+    control.disabled = isEditing;
+  }
 }
 
 function getCheckedValues(name) {
@@ -421,14 +723,6 @@ function setCheckedValues(name, values) {
 function syncMethodAllState() {
   const selectedMethods = getCheckedValues("method");
   elements.methodAll.checked = selectedMethods.length === 0;
-}
-
-function parseDomainList(value) {
-  return value
-    .split(",")
-    .map(normalizeDomain)
-    .filter(Boolean)
-    .filter((domain, index, domains) => domains.indexOf(domain) === index);
 }
 
 function getInitiatorDomains() {
@@ -494,22 +788,4 @@ function renderInitiatorDomainPills() {
     pill.append(text, removeButton);
     elements.initiatorDomainList.append(pill);
   }
-}
-
-function normalizeInitiatorDomains(initiatorDomains) {
-  if (!Array.isArray(initiatorDomains)) {
-    return DEFAULT_INITIATOR_DOMAINS;
-  }
-
-  return initiatorDomains.map(normalizeDomain).filter(Boolean);
-}
-
-function normalizeDomain(domain) {
-  return String(domain)
-    .trim()
-    .replace(/^https?:\/\//i, "")
-    .replace(/^wss?:\/\//i, "")
-    .replace(/\/.*$/, "")
-    .replace(/:\d+$/, "")
-    .toLowerCase();
 }

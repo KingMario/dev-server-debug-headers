@@ -1,0 +1,31 @@
+{
+  "name": "dev-server-debug-headers",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Chrome Manifest V3 extension for dev server request-header debugging.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "check": "npm run check:js && npm run check:manifest",
+    "check:js": "node --check src/core.js && node --check src/options.js && node --check src/background.js && node --check test/core.test.js",
+    "check:manifest": "node -e \"JSON.parse(require('node:fs').readFileSync('manifest.json', 'utf8')); console.log('manifest ok')\"",
+    "coverage": "node --test --experimental-test-coverage",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "precommit": "lint-staged && npm run lint && npm test",
+    "prepare": "husky",
+    "test": "node --test"
+  },
+  "lint-staged": {
+    "*": "prettier --write --ignore-unknown",
+    "*.js": "eslint --fix"
+  },
+  "devDependencies": {
+    "eslint": "^10.4.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.5",
+    "prettier": "^3.8.3"
+  }
+}

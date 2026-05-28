@@ -13,16 +13,34 @@
           <h1>Dev Server Debug Headers</h1>
           <p>Apply request header changes for dev server debugging.</p>
         </div>
-        <label class="switch">
-          <input id="enabled" type="checkbox" />
-          <span>Enabled</span>
-        </label>
+        <div class="topbar-actions">
+          <label class="switch">
+            <input id="enabled" type="checkbox" />
+            <span>Enabled</span>
+          </label>
+          <div class="sync-option">
+            <label class="switch">
+              <input
+                id="sync-enabled"
+                type="checkbox"
+                aria-describedby="sync-note"
+              />
+              <span>Chrome sync</span>
+            </label>
+            <p id="sync-note">
+              Cross-device sharing requires Chrome sign-in and sync.
+            </p>
+          </div>
+        </div>
       </header>
 
       <div class="workspace">
         <section class="panel editor-panel" aria-labelledby="rule-form-title">
           <div class="panel-title">
-            <h2 id="rule-form-title">Rule</h2>
+            <div class="editor-title">
+              <h2 id="rule-form-title">Rule</h2>
+              <span id="editing-rule-title" hidden></span>
+            </div>
             <div class="panel-actions">
               <button id="save-rule" type="submit" form="rule-form"></button>
               <button

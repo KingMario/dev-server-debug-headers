@@ -23,9 +23,33 @@ request initiator domain and default to `localhost` and `127.0.0.1`.
 - `Operation` maps to Chrome `declarativeNetRequest.modifyHeaders`.
 - `Methods` and `Resource type` are optional filters.
   Use `WebSocket` to target `ws://` and `wss://` handshake requests.
+- Enable **Chrome sync** in the popup to store the config in
+  `chrome.storage.sync`. Cross-device sharing requires Chrome sign-in and sync;
+  otherwise Chrome keeps the data in the current profile.
 
 The extension uses Declarative Net Request dynamic rules and stores all user
-configuration in `chrome.storage.local`.
+configuration in `chrome.storage.local` by default. When **Chrome sync** is
+enabled, the active configuration is stored in `chrome.storage.sync` instead.
+
+## Development
+
+Install development dependencies:
+
+```bash
+npm install
+```
+
+Useful checks:
+
+```bash
+npm run lint
+npm run check
+npm test
+npm run coverage
+```
+
+Before committing, the Husky pre-commit hook runs `npm run precommit`, which
+formats staged files with lint-staged, runs full ESLint, and runs unit tests.
 
 ## License
 
