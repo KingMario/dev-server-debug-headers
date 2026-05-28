@@ -4,6 +4,8 @@ A small Chrome Manifest V3 extension for adding, replacing, appending, or
 removing request headers while debugging dev servers. Rules can restrict the
 request initiator domain and default to `localhost` and `127.0.0.1`.
 
+Documentation site: <https://mario.studio/dev-server-debug-headers>
+
 ## Install for local development
 
 1. Open `chrome://extensions`.
@@ -30,6 +32,9 @@ request initiator domain and default to `localhost` and `127.0.0.1`.
 The extension uses Declarative Net Request dynamic rules and stores all user
 configuration in `chrome.storage.local` by default. When **Chrome sync** is
 enabled, the active configuration is stored in `chrome.storage.sync` instead.
+
+See [docs/usage.md](docs/usage.md) for usage scenarios, rule tips, Chrome sync
+behavior, and corner cases.
 
 ## Development
 
