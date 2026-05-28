@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dev Server Debug Headers</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <h1>Dev Server Debug Headers</h1>
+          <p>Apply request header changes for dev server debugging.</p>
+        </div>
+        <label class="switch">
+          <input id="enabled" type="checkbox" />
+          <span>Enabled</span>
+        </label>
+      </header>
+
+      <div class="workspace">
+        <section class="panel editor-panel" aria-labelledby="rule-form-title">
+          <div class="panel-title">
+            <h2 id="rule-form-title">Rule</h2>
+            <div class="panel-actions">
+              <button id="save-rule" type="submit" form="rule-form"></button>
+              <button
+                id="cancel-edit"
+                type="button"
+                class="secondary"
+                hidden
+              ></button>
+            </div>
+          </div>
+          <form id="rule-form" autocomplete="off">
+            <input id="editing-id" type="hidden" />
+
+            <div class="grid">
+              <label>
+                URL contains
+                <input
+                  id="url-contains"
+                  name="urlContains"
+                  placeholder="/v1/"
+                />
+              </label>
+
+              <label>
+                Header name
+                <input
+                  id="header-name"
+                  name="headerName"
+                  placeholder="x-debug-user"
+                  required
+                />
+              </label>
+
+              <label>
+                Header value
+                <input
+                  id="header-value"
+                  name="headerValue"
+                  placeholder="alice@example.com"
+                />
+              </label>
+
+              <label>
+                Operation
+                <select id="operation" name="operation">
+                  <option value="set">Set or replace</option>
+                  <option value="append">Append</option>
+                  <option value="remove">Remove</option>
+                </select>
+              </label>
+
+              <label>
+                Resource type
+                <select id="resource-type" name="resourceType">
+                  <option value="">All</option>
+                  <option value="xmlhttprequest">XHR / Fetch</option>
+                  <option value="main_frame">Main frame</option>
+                  <option value="sub_frame">Sub frame</option>
+                  <option value="script">Script</option>
+                  <option value="stylesheet">Stylesheet</option>
+                  <option value="image">Image</option>
+                  <option value="websocket">WebSocket</option>
+                </select>
+              </label>
+
+              <div class="initiator-field field" id="initiator-domain-field">
+                <span>Initiator domains</span>
+                <div class="pill-input" id="initiator-domain-pills">
+                  <div class="pill-list" id="initiator-domain-list"></div>
+                  <input
+                    id="initiator-domain-input"
+                    name="initiatorDomains"
+                    placeholder="Add domain"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <fieldset id="methods-fieldset">
+              <legend>Methods</legend>
+              <label
+                ><input
+                  type="checkbox"
+                  id="method-all"
+                  name="methodAll"
+                  checked
+                />All</label
+              >
+              <label
+                ><input type="checkbox" name="method" value="get" />GET</label
+              >
+              <label
+                ><input type="checkbox" name="method" value="post" />POST</label
+              >
+              <label
+                ><input type="checkbox" name="method" value="put" />PUT</label
+              >
+              <label
+                ><input
+                  type="checkbox"
+                  name="method"
+                  value="patch"
+                />PATCH</label
+              >
+              <label
+                ><input
+                  type="checkbox"
+                  name="method"
+                  value="delete"
+                />DELETE</label
+              >
+            </fieldset>
+          </form>
+        </section>
+
+        <section class="panel rules-panel" aria-labelledby="rules-title">
+          <div class="panel-title">
+            <h2 id="rules-title">Rules</h2>
+            <div class="panel-actions">
+              <button id="import" type="button" class="secondary"></button>
+              <button id="export" type="button" class="secondary"></button>
+              <input id="import-file" type="file" accept="application/json" />
+            </div>
+          </div>
+          <div id="empty-state" class="empty">No header rules yet.</div>
+          <ul id="rules" class="rules"></ul>
+        </section>
+      </div>
+    </main>
+
+    <script src="options.js" type="module"></script>
+  </body>
+</html>
