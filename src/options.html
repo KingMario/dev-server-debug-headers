@@ -11,7 +11,7 @@
       <header class="topbar">
         <div>
           <h1>Dev Server Debug Headers</h1>
-          <p>Apply request header changes for dev server debugging.</p>
+          <p>Modify request and response headers for dev server debugging.</p>
         </div>
         <div class="topbar-actions">
           <label class="switch">
@@ -53,6 +53,29 @@
           </div>
           <form id="rule-form" autocomplete="off">
             <input id="editing-id" type="hidden" />
+
+            <fieldset class="target-fieldset" aria-label="Header direction">
+              <legend>Header direction</legend>
+              <label
+                ><input
+                  type="radio"
+                  name="headerTarget"
+                  value="request"
+                  checked
+                />Request</label
+              >
+              <label
+                ><input
+                  type="radio"
+                  name="headerTarget"
+                  value="response"
+                />Response</label
+              >
+              <label class="response-condition" hidden>
+                <input id="response-header-condition" type="checkbox" />
+                Only if response already has this header
+              </label>
+            </fieldset>
 
             <div class="grid">
               <label>

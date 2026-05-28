@@ -14,11 +14,12 @@
 </p>
 
 Dev Server Debug Headers is a lightweight Chrome extension for modifying
-request headers while debugging local and development servers.
+request and response headers while debugging local and development servers.
 
 Use it when you need to:
 
 - Add or replace debug headers for local frontend requests.
+- Adjust response headers for CORS, CSP, cache, and iframe debugging.
 - Scope rules by request initiator domain, such as `localhost`.
 - Test WebSocket handshake headers.
 - Share development header rules across machines with Chrome sync.

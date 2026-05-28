@@ -7,6 +7,7 @@ import {
   createRuleTitle,
   findRuleTitleElementById,
   groupEntriesByInitiatorDomains,
+  normalizeHeaderTarget,
   normalizeImportedConfig,
   normalizeInitiatorDomains,
   normalizeSettings,
@@ -31,6 +32,9 @@ const elements = {
   syncEnabled: document.querySelector("#sync-enabled"),
   form: document.querySelector("#rule-form"),
   editingId: document.querySelector("#editing-id"),
+  headerTargetInputs: document.querySelectorAll('input[name="headerTarget"]'),
+  responseHeaderCondition: document.querySelector("#response-header-condition"),
+  responseConditionField: document.querySelector(".response-condition"),
   urlContains: document.querySelector("#url-contains"),
   headerName: document.querySelector("#header-name"),
   headerValue: document.querySelector("#header-value"),
@@ -104,6 +108,10 @@ elements.syncEnabled.addEventListener("change", async () => {
 elements.operation.addEventListener("change", () => {
   elements.headerValue.disabled = elements.operation.value === "remove";
 });
+
+for (const input of elements.headerTargetInputs) {
+  input.addEventListener("change", syncHeaderTargetState);
+}
 
 elements.methodAll.addEventListener("change", () => {
   if (elements.methodAll.checked) {
@@ -300,14 +308,53 @@ function render() {
   elements.rules.innerHTML = "";
   elements.emptyState.hidden = config.entries.length > 0;
 
-  for (const group of groupEntriesByInitiatorDomains(config.entries)) {
-    elements.rules.append(createRuleGroup(group));
+  for (const group of groupEntriesByHeaderTarget(config.entries)) {
+    elements.rules.append(createRuleTargetGroup(group));
   }
 
   syncRulesPanelDisabledState();
 }
 
-function createRuleGroup(group) {
+function groupEntriesByHeaderTarget(entries) {
+  return [
+    {
+      key: "request",
+      title: "Request headers",
+      entries: entries.filter(
+        (entry) => normalizeHeaderTarget(entry.headerTarget) === "request",
+      ),
+    },
+    {
+      key: "response",
+      title: "Response headers",
+      entries: entries.filter(
+        (entry) => normalizeHeaderTarget(entry.headerTarget) === "response",
+      ),
+    },
+  ].filter((group) => group.key === "request" || group.entries.length > 0);
+}
+
+function createRuleTargetGroup(group) {
+  const groupItem = document.createElement("li");
+  groupItem.className = "rule-target-group";
+  groupItem.dataset.headerTarget = group.key;
+
+  const title = document.createElement("div");
+  title.className = "rule-target-title";
+  title.textContent = group.title;
+
+  const domains = document.createElement("ul");
+  domains.className = "rule-group-list";
+
+  for (const domainGroup of groupEntriesByInitiatorDomains(group.entries)) {
+    domains.append(createRuleGroup(domainGroup, group.key));
+  }
+
+  groupItem.append(title, domains);
+  return groupItem;
+}
+
+function createRuleGroup(group, headerTarget = "request") {
   const groupItem = document.createElement("li");
   groupItem.className = "rule-group";
 
@@ -321,7 +368,7 @@ function createRuleGroup(group) {
   header.append(
     title,
     createIconButton("Add new rule", "plus", () =>
-      startNewRuleForDomains(group.domains),
+      startNewRuleForDomains(group.domains, headerTarget),
     ),
   );
 
@@ -336,8 +383,9 @@ function createRuleGroup(group) {
   return groupItem;
 }
 
-function startNewRuleForDomains(domains) {
+function startNewRuleForDomains(domains, headerTarget = "request") {
   resetForm();
+  setHeaderTarget(headerTarget);
   setInitiatorDomains(domains);
   elements.urlContains.focus();
 }
@@ -657,6 +705,9 @@ async function deleteEntry(id) {
 
 function editEntry(entry) {
   elements.editingId.value = entry.id;
+  setHeaderTarget(normalizeHeaderTarget(entry.headerTarget));
+  elements.responseHeaderCondition.checked =
+    entry.responseHeaderConditionEnabled === true;
   elements.urlContains.value = entry.urlContains;
   elements.headerName.value = entry.headerName;
   elements.headerValue.value = entry.headerValue;
@@ -667,16 +718,21 @@ function editEntry(entry) {
   syncMethodAllState();
   elements.cancelEdit.hidden = false;
   elements.headerValue.disabled = entry.operation === "remove";
+  syncHeaderTargetState();
   syncRulesPanelDisabledState();
 }
 
 function readEntryFromForm() {
   const operation = elements.operation.value;
+  const headerTarget = getHeaderTarget();
   return {
     urlContains: elements.urlContains.value.trim(),
     headerName: elements.headerName.value.trim().toLowerCase(),
     headerValue: operation === "remove" ? "" : elements.headerValue.value,
+    headerTarget,
     operation,
+    responseHeaderConditionEnabled:
+      headerTarget === "response" && elements.responseHeaderCondition.checked,
     methods: getCheckedValues("method"),
     resourceTypes: elements.resourceType.value
       ? [elements.resourceType.value]
@@ -689,12 +745,41 @@ function resetForm() {
   elements.form.reset();
   elements.editingId.value = "";
   clearEditingRuleTitle();
+  setHeaderTarget("request");
+  elements.responseHeaderCondition.checked = false;
   elements.operation.value = "set";
   setInitiatorDomains(DEFAULT_INITIATOR_DOMAINS);
   elements.methodAll.checked = true;
   elements.cancelEdit.hidden = true;
   elements.headerValue.disabled = false;
+  syncHeaderTargetState();
   syncRulesPanelDisabledState();
+}
+
+function getHeaderTarget() {
+  return normalizeHeaderTarget(
+    document.querySelector('input[name="headerTarget"]:checked')?.value,
+  );
+}
+
+function setHeaderTarget(headerTarget) {
+  const normalizedHeaderTarget = normalizeHeaderTarget(headerTarget);
+
+  for (const input of elements.headerTargetInputs) {
+    input.checked = input.value === normalizedHeaderTarget;
+  }
+
+  syncHeaderTargetState();
+}
+
+function syncHeaderTargetState() {
+  const isResponse = getHeaderTarget() === "response";
+  elements.responseConditionField.hidden = !isResponse;
+  elements.responseHeaderCondition.disabled = !isResponse;
+
+  if (!isResponse) {
+    elements.responseHeaderCondition.checked = false;
+  }
 }
 
 function syncRulesPanelDisabledState() {

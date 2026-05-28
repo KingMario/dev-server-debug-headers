@@ -9,6 +9,7 @@ export const DEFAULT_SETTINGS = {
   storageArea: "local",
 };
 export const DEFAULT_INITIATOR_DOMAINS = ["localhost", "127.0.0.1"];
+export const HEADER_TARGETS = ["request", "response"];
 
 /**
  * @typedef {Object} RuleEntry
@@ -17,7 +18,9 @@ export const DEFAULT_INITIATOR_DOMAINS = ["localhost", "127.0.0.1"];
  * @property {string} urlContains
  * @property {string} headerName
  * @property {string} headerValue
+ * @property {"request" | "response"} headerTarget
  * @property {"set" | "append" | "remove"} operation
+ * @property {boolean} responseHeaderConditionEnabled
  * @property {string[]} methods
  * @property {string[]} resourceTypes
  * @property {string[]} initiatorDomains
@@ -87,7 +90,11 @@ export function normalizeImportedEntry(
       .trim()
       .toLowerCase(),
     headerValue: operation === "remove" ? "" : String(entry?.headerValue || ""),
+    headerTarget: normalizeHeaderTarget(entry?.headerTarget),
     operation,
+    responseHeaderConditionEnabled:
+      normalizeHeaderTarget(entry?.headerTarget) === "response" &&
+      entry?.responseHeaderConditionEnabled === true,
     methods: Array.isArray(entry?.methods) ? entry.methods.filter(Boolean) : [],
     resourceTypes: Array.isArray(entry?.resourceTypes)
       ? entry.resourceTypes.filter(Boolean)
@@ -133,6 +140,10 @@ export function groupEntriesByInitiatorDomains(entries) {
  */
 export function createRuleTitle(entry) {
   return `${entry.operation.toUpperCase()} ${entry.headerName}`;
+}
+
+export function normalizeHeaderTarget(headerTarget) {
+  return HEADER_TARGETS.includes(headerTarget) ? headerTarget : "request";
 }
 
 /**
@@ -199,7 +210,9 @@ export function buildRules(config) {
       priority: 1,
       action: {
         type: "modifyHeaders",
-        requestHeaders: [buildHeaderOperation(entry)],
+        [`${normalizeHeaderTarget(entry.headerTarget)}Headers`]: [
+          buildHeaderOperation(entry),
+        ],
       },
       condition: buildCondition(entry),
     }));
@@ -284,9 +297,20 @@ export function buildCondition(entry) {
   return {
     regexFilter: buildRegexFilter(urlContains),
     ...(initiatorDomains.length > 0 ? { initiatorDomains } : {}),
+    ...(shouldMatchExistingResponseHeader(entry)
+      ? { responseHeaders: [{ header: entry.headerName.trim() }] }
+      : {}),
     ...(methods.length > 0 ? { requestMethods: methods } : {}),
     ...(resourceTypes.length > 0 ? { resourceTypes } : {}),
   };
+}
+
+export function shouldMatchExistingResponseHeader(entry) {
+  return (
+    normalizeHeaderTarget(entry.headerTarget) === "response" &&
+    entry.responseHeaderConditionEnabled === true &&
+    Boolean(entry.headerName?.trim())
+  );
 }
 
 export function buildRegexFilter(urlContains) {
@@ -381,8 +405,10 @@ export function summarizeRule(rule) {
   return {
     id: rule.id,
     requestHeaders: rule.action.requestHeaders,
+    responseHeaders: rule.action.responseHeaders,
     regexFilter: rule.condition.regexFilter,
     initiatorDomains: rule.condition.initiatorDomains,
+    conditionResponseHeaders: rule.condition.responseHeaders,
     requestMethods: rule.condition.requestMethods,
     resourceTypes: rule.condition.resourceTypes,
   };

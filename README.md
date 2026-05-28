@@ -1,8 +1,9 @@
 # Dev Server Debug Headers
 
 A small Chrome Manifest V3 extension for adding, replacing, appending, or
-removing request headers while debugging dev servers. Rules can restrict the
-request initiator domain and default to `localhost` and `127.0.0.1`.
+removing request and response headers while debugging dev servers. Rules can
+restrict the request initiator domain and default to `localhost` and
+`127.0.0.1`.
 
 Documentation site: <https://mario.studio/dev-server-debug-headers>
 
@@ -22,7 +23,10 @@ Documentation site: <https://mario.studio/dev-server-debug-headers>
 - The extension badge counts enabled rules whose initiator domains match the
   current tab.
 - `URL contains` is optional and is matched inside the full request URL.
+- Rules can target request headers or response headers.
 - `Operation` maps to Chrome `declarativeNetRequest.modifyHeaders`.
+- Response rules can optionally match only when the response already contains
+  the same header name.
 - `Methods` and `Resource type` are optional filters.
   Use `WebSocket` to target `ws://` and `wss://` handshake requests.
 - Enable **Chrome sync** in the popup to store the config in

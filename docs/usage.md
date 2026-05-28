@@ -14,9 +14,9 @@
 </p>
 
 Dev Server Debug Headers is a small Chrome Manifest V3 extension for changing
-request headers while debugging local or development servers. It is useful when
-you need a lightweight ModHeader-style workflow, but want rules to be scoped to
-the page that initiates requests.
+request and response headers while debugging local or development servers. It
+is useful when you need a lightweight ModHeader-style workflow, but want rules
+to be scoped to the page that initiates requests.
 
 ## Typical Use Cases
 
@@ -24,6 +24,8 @@ the page that initiates requests.
 - Switch a backend feature flag by setting a request header.
 - Append or remove a header for one development app without affecting unrelated
   browsing.
+- Adjust response headers such as CORS, CSP, cache, or iframe-related headers
+  to validate a dev-server hypothesis.
 - Target WebSocket handshake requests during realtime debugging.
 - Share the same development header rules across machines with Chrome sync.
 
@@ -31,6 +33,8 @@ the page that initiates requests.
 
 Each rule describes one header operation:
 
+- `Header direction`: whether the rule modifies request headers or response
+  headers.
 - `URL contains`: optional text matched against the full request URL.
 - `Header name`: the request header to modify.
 - `Header value`: the value used by `set` and `append`.
@@ -38,6 +42,10 @@ Each rule describes one header operation:
 - `Resource type`: optional request type filter.
 - `Initiator domains`: the page origins allowed to initiate matching requests.
 - `Methods`: optional HTTP method filter.
+
+Response rules also support `Only if response already has this header`. When
+enabled, Chrome evaluates the rule after response headers are available and only
+applies it if the response contains the same header name.
 
 The important scoping field is **Initiator domains**. It maps to Chrome
 Declarative Net Request `condition.initiatorDomains`, so it matches the page
@@ -64,22 +72,54 @@ the request destination is `api.example.com`.
 
 1. Fill in `URL contains` when you want to narrow the match to a path or query
    fragment, such as `/v1/` or `/graphql`.
-2. Enter a lower-case or mixed-case header name. The extension normalizes header
+2. Choose `Request` or `Response` as the header direction.
+3. Enter a lower-case or mixed-case header name. The extension normalizes header
    names to lower case when importing or saving through the UI.
-3. Choose an operation:
+4. Choose an operation:
    - `Set or replace`: set the header value or replace an existing value.
    - `Append`: append a value to an existing header when Chrome allows it.
    - `Remove`: remove the header; the value field is ignored.
-4. Choose a resource type only when you need one. Leave it as `All` for broad
+5. For response rules, optionally check `Only if response already has this
+header`.
+6. Choose a resource type only when you need one. Leave it as `All` for broad
    matching.
-5. Add initiator domains. If the list is empty, the extension defaults to
+7. Add initiator domains. If the list is empty, the extension defaults to
    `localhost` and `127.0.0.1`.
-6. Choose methods. If `All` is checked, no method filter is emitted.
-7. Click save.
+8. Choose methods. If `All` is checked, no method filter is emitted.
+9. Click save.
 
-Rules appear in the right panel grouped by normalized initiator domain. Click a
-rule title to edit it. Use the checkbox at the start of a row to enable or
-disable a rule. Use the red `x` to delete a rule.
+Rules appear in the right panel grouped first by request/response direction and
+then by normalized initiator domain. Click a rule title to edit it. Use the
+checkbox at the start of a row to enable or disable a rule. Use the red `x` to
+delete a rule.
+
+## Response Header Rules
+
+Response rules are useful for local experiments where you need to validate how
+the browser would behave if the server returned different headers.
+
+Common examples:
+
+- Add or adjust CORS headers such as `Access-Control-Allow-Origin`,
+  `Access-Control-Allow-Headers`, `Access-Control-Allow-Methods`, and
+  `Access-Control-Allow-Credentials`.
+- Remove or relax `Content-Security-Policy` while debugging script, style,
+  worker, or connection restrictions.
+- Remove iframe restrictions such as `X-Frame-Options` or CSP
+  `frame-ancestors` for local embedding tests.
+- Change cache headers such as `Cache-Control`, `ETag`, `Expires`, and
+  `Last-Modified`.
+- Test cross-origin isolation headers such as `Cross-Origin-Opener-Policy`,
+  `Cross-Origin-Embedder-Policy`, and `Cross-Origin-Resource-Policy`.
+
+Limitations:
+
+- Response header changes happen after the server has already received the
+  request.
+- CORS debugging can still involve preflight requests, credentials, and browser
+  origin checks. Treat response header modification as a development aid, not a
+  production CORS bypass.
+- Some sensitive headers may have browser or API-specific restrictions.
 
 ## WebSocket Requests
 

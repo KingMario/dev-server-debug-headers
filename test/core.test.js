@@ -14,11 +14,13 @@ import {
   groupEntriesByInitiatorDomains,
   isEnabledRuleForDomain,
   normalizeDomain,
+  normalizeHeaderTarget,
   normalizeImportedConfig,
   normalizeImportedEntry,
   normalizeInitiatorDomains,
   normalizeSettings,
   parseDomainList,
+  shouldMatchExistingResponseHeader,
   summarizeRule,
   switchStorageArea,
 } from "../src/core.js";
@@ -80,7 +82,9 @@ describe("settings and imported config normalization", () => {
           urlContains: "/v1/",
           headerName: "x-debug-user",
           headerValue: "",
+          headerTarget: "request",
           operation: "remove",
+          responseHeaderConditionEnabled: false,
           methods: ["get", "post"],
           resourceTypes: ["xmlhttprequest"],
           initiatorDomains: ["localhost"],
@@ -106,6 +110,36 @@ describe("settings and imported config normalization", () => {
       ).operation,
       "set",
     );
+    assert.equal(
+      normalizeImportedEntry({
+        headerName: "x",
+        headerTarget: "bad",
+      }).headerTarget,
+      "request",
+    );
+    assert.deepEqual(
+      normalizeImportedEntry(
+        {
+          headerName: "x",
+          headerTarget: "response",
+          responseHeaderConditionEnabled: true,
+        },
+        () => "response-id",
+      ),
+      {
+        id: "response-id",
+        enabled: true,
+        urlContains: "",
+        headerName: "x",
+        headerValue: "",
+        headerTarget: "response",
+        operation: "set",
+        responseHeaderConditionEnabled: true,
+        methods: [],
+        resourceTypes: [],
+        initiatorDomains: DEFAULT_INITIATOR_DOMAINS,
+      },
+    );
 
     assert.match(
       normalizeImportedEntry({ headerName: "x" }).id,
@@ -120,6 +154,34 @@ describe("settings and imported config normalization", () => {
       /^[\da-f-]{36}$/i,
     );
     assert.equal(normalizeImportedConfig({ entries: [] }).enabled, true);
+  });
+});
+
+describe("header target helpers", () => {
+  it("normalizes request and response header targets", () => {
+    assert.equal(normalizeHeaderTarget("request"), "request");
+    assert.equal(normalizeHeaderTarget("response"), "response");
+    assert.equal(normalizeHeaderTarget("bad"), "request");
+    assert.equal(normalizeHeaderTarget(), "request");
+  });
+
+  it("matches existing response headers only for response rules", () => {
+    assert.equal(
+      shouldMatchExistingResponseHeader({
+        ...baseEntry,
+        headerTarget: "response",
+        responseHeaderConditionEnabled: true,
+      }),
+      true,
+    );
+    assert.equal(
+      shouldMatchExistingResponseHeader({
+        ...baseEntry,
+        headerTarget: "request",
+        responseHeaderConditionEnabled: true,
+      }),
+      false,
+    );
   });
 });
 
@@ -200,6 +262,53 @@ describe("DNR rule building", () => {
       requestMethods: ["get"],
       resourceTypes: ["xmlhttprequest"],
     });
+    assert.deepEqual(
+      buildCondition({
+        ...baseEntry,
+        headerTarget: "response",
+        responseHeaderConditionEnabled: true,
+      }),
+      {
+        regexFilter: "^(https?|wss?)://.*/api",
+        initiatorDomains: ["localhost"],
+        responseHeaders: [{ header: "x-debug" }],
+        requestMethods: ["get"],
+        resourceTypes: ["xmlhttprequest"],
+      },
+    );
+  });
+
+  it("builds request and response header modification rules", () => {
+    const log = mock.method(console, "log", () => {});
+    const [requestRule, responseRule] = buildRules({
+      enabled: true,
+      entries: [
+        baseEntry,
+        {
+          ...baseEntry,
+          id: "response-rule",
+          headerTarget: "response",
+          headerName: "access-control-allow-origin",
+          headerValue: "*",
+        },
+      ],
+    });
+
+    assert.deepEqual(requestRule.action, {
+      type: "modifyHeaders",
+      requestHeaders: [{ header: "x-debug", operation: "set", value: "on" }],
+    });
+    assert.deepEqual(responseRule.action, {
+      type: "modifyHeaders",
+      responseHeaders: [
+        {
+          header: "access-control-allow-origin",
+          operation: "set",
+          value: "*",
+        },
+      ],
+    });
+    log.mock.restore();
   });
 
   it("escapes URL filters and supports empty optional filters", () => {
@@ -263,8 +372,10 @@ describe("DNR rule building", () => {
     assert.deepEqual(summarizeRule(rule), {
       id: 1,
       requestHeaders: [{ header: "x-debug", operation: "set", value: "on" }],
+      responseHeaders: undefined,
       regexFilter: "^(https?|wss?)://.*/api",
       initiatorDomains: ["localhost"],
+      conditionResponseHeaders: undefined,
       requestMethods: ["get"],
       resourceTypes: ["xmlhttprequest"],
     });

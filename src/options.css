@@ -364,6 +364,14 @@ fieldset input {
   width: auto;
 }
 
+.target-fieldset {
+  margin-top: 12px;
+}
+
+.response-condition[hidden] {
+  display: none;
+}
+
 .rules {
   display: grid;
   gap: 14px;
@@ -375,6 +383,17 @@ fieldset input {
 .rule-group {
   display: grid;
   gap: 8px;
+}
+
+.rule-target-group {
+  display: grid;
+  gap: 10px;
+}
+
+.rule-target-title {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .rule-group-header {
