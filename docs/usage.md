@@ -84,7 +84,10 @@ header`.
 6. Choose a resource type only when you need one. Leave it as `All` for broad
    matching.
 7. Add initiator domains. If the list is empty, the extension defaults to
-   `localhost` and `127.0.0.1`.
+   `localhost` and `127.0.0.1`. Use the current-tab button at the end of the
+   `Initiator domains` label row to add the active tab's domain. The button is
+   shown only when the active tab is a normal `http` or `https` page, and is
+   hidden on browser-internal or extension pages.
 8. Choose methods. If `All` is checked, no method filter is emitted.
 9. Click save.
 
@@ -221,6 +224,9 @@ already synced rules instead of replacing them with an empty local config.
 
 - Keep initiator domains narrow. Prefer `localhost`, `127.0.0.1`, or a specific
   dev domain instead of broad domains.
+- Use the current-tab button when you opened the exact app page that should
+  initiate the matching requests. It is hidden on browser-internal pages such
+  as `chrome://` URLs, extension pages, and other non-`http`/`https` pages.
 - Use `URL contains` for API path scoping. For example, use `/v1/` to avoid
   touching every request from the same page.
 - Leave `Methods` as `All` unless the backend behavior differs by method.

@@ -44,6 +44,7 @@ const elements = {
   initiatorDomainPills: document.querySelector("#initiator-domain-pills"),
   initiatorDomainList: document.querySelector("#initiator-domain-list"),
   initiatorDomainInput: document.querySelector("#initiator-domain-input"),
+  addCurrentTabDomain: document.querySelector("#add-current-tab-domain"),
   methodsFieldset: document.querySelector("#methods-fieldset"),
   methodAll: document.querySelector("#method-all"),
   ruleFormTitle: document.querySelector("#rule-form-title"),
@@ -67,6 +68,7 @@ let editingRuleTitleToken = 0;
 let editorBaseline = "";
 initializeIconButtons();
 resetForm();
+await syncCurrentTabDomainButton();
 render();
 
 elements.enabled.addEventListener("change", async () => {
@@ -146,13 +148,30 @@ elements.methodsFieldset.addEventListener("pointerdown", (event) => {
 });
 
 elements.initiatorDomainField.addEventListener("pointerdown", (event) => {
-  if (event.target.closest(".pill-remove")) {
+  if (event.target.closest("button, .pill-remove")) {
     return;
   }
 
   setTimeout(() => {
     elements.initiatorDomainInput.focus();
   });
+});
+
+elements.addCurrentTabDomain.addEventListener("click", async () => {
+  const domain = await getCurrentTabDomain();
+  elements.addCurrentTabDomain.hidden = !domain;
+
+  if (!domain) {
+    return;
+  }
+
+  const added = addInitiatorDomain(domain, { clearInput: false });
+  flashButtonTitle(
+    elements.addCurrentTabDomain,
+    added ? `Added ${domain}` : `${domain} already exists`,
+    "Add current tab domain",
+  );
+  elements.initiatorDomainInput.focus();
 });
 
 elements.initiatorDomainInput.addEventListener("keydown", (event) => {
@@ -475,6 +494,11 @@ function createRuleEnabledToggle(entry, ruleTitle) {
 function initializeIconButtons() {
   setIconButton(elements.saveRule, "Save rule", "save");
   setIconButton(elements.cancelEdit, "Cancel edit", "undo");
+  setIconButton(
+    elements.addCurrentTabDomain,
+    "Add current tab domain",
+    "crosshair",
+  );
   setIconButton(elements.import, "Import JSON", "upload");
   setIconButton(elements.export, "Export JSON", "download");
 }
@@ -687,6 +711,8 @@ function getIconSvg(name) {
   const icons = {
     clone:
       '<path fill="currentColor" stroke="none" d="M22.335273 1.090909v20.379273h-2.877818V22.909091H2.181818V3.967636h1.437818V1.090909h18.715636z m-4.556727 4.554545H3.859636v15.585818h13.92V5.645455z m2.876727-2.876727H5.298545v1.198909h14.16l-0.001091 15.823636h1.197818V2.768727z m-5.370545 14.145818v1.678909H6.526909v-1.678909h8.757818z m0-4.315636v1.678909H6.526909v-1.678909h8.757818z m0-4.178182v1.678909H6.526909V8.420727h8.757818z" />',
+    crosshair:
+      '<circle cx="12" cy="12" r="7" /><path d="M12 3v3" /><path d="M12 18v3" /><path d="M3 12h3" /><path d="M18 12h3" />',
     download:
       '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="M7 10l5 5 5-5" /><path d="M12 15V3" />',
     plus: '<path d="M12 5v14" /><path d="M5 12h14" />',
@@ -724,6 +750,34 @@ async function deleteEntry(id) {
   config.entries = config.entries.filter((entry) => entry.id !== id);
   await saveConfig();
   render();
+}
+
+async function getCurrentTabDomain() {
+  try {
+    const [tab] = await chrome.tabs.query({
+      active: true,
+      currentWindow: true,
+    });
+    return getPageHostname(tab?.url);
+  } catch (error) {
+    console.error("[Dev Server Debug Headers] active tab lookup failed", error);
+    return "";
+  }
+}
+
+async function syncCurrentTabDomainButton() {
+  elements.addCurrentTabDomain.hidden = !(await getCurrentTabDomain());
+}
+
+function getPageHostname(url) {
+  try {
+    const parsedUrl = new URL(url || "");
+    return ["http:", "https:"].includes(parsedUrl.protocol)
+      ? parsedUrl.hostname
+      : "";
+  } catch {
+    return "";
+  }
 }
 
 function cloneEntry(entry) {
@@ -875,20 +929,24 @@ function setInitiatorDomains(domains) {
   renderInitiatorDomainPills();
 }
 
-function addInitiatorDomain(value) {
+function addInitiatorDomain(value, { clearInput = true } = {}) {
   const domains = parseDomainList(value);
   const addedDomains = domains.filter(
     (domain) => !currentInitiatorDomains.includes(domain),
   );
 
   if (addedDomains.length === 0) {
-    elements.initiatorDomainInput.value = "";
+    if (clearInput) {
+      elements.initiatorDomainInput.value = "";
+    }
     syncRulesPanelDisabledState();
     return false;
   }
 
   currentInitiatorDomains = currentInitiatorDomains.concat(addedDomains);
-  elements.initiatorDomainInput.value = "";
+  if (clearInput) {
+    elements.initiatorDomainInput.value = "";
+  }
   renderInitiatorDomainPills();
   syncRulesPanelDisabledState();
   return true;

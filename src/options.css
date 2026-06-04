@@ -19,6 +19,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 html {
   width: 780px;
   height: 600px;
@@ -220,6 +224,14 @@ label,
   font-weight: 600;
 }
 
+.field-label-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 input,
 select,
 button {
@@ -328,6 +340,12 @@ button.icon-button {
   place-items: center;
 }
 
+button.compact-icon {
+  width: 28px;
+  min-width: 28px;
+  min-height: 28px;
+}
+
 button.icon-button svg {
   width: 20px;
   height: 20px;
@@ -336,6 +354,11 @@ button.icon-button svg {
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 2.2;
+}
+
+button.compact-icon svg {
+  width: 18px;
+  height: 18px;
 }
 
 button.secondary {

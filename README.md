@@ -19,7 +19,10 @@ Documentation site: <https://mario.studio/dev-server-debug-headers>
 - Host access is currently `<all_urls>`, plus explicit `ws://*/*` and
   `wss://*/*` host permissions for WebSocket handshakes.
 - Each rule can set `initiatorDomains`; the default is `localhost` and
-  `127.0.0.1`.
+  `127.0.0.1`. Use the current-tab button at the end of the
+  **Initiator domains** label row to add the active tab's domain on normal
+  `http` or `https` pages. The button is hidden on browser-internal pages such
+  as `chrome://` URLs.
 - The extension badge counts enabled rules whose initiator domains match the
   current tab.
 - `URL contains` is optional and is matched inside the full request URL.
