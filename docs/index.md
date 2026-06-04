@@ -21,6 +21,7 @@ Use it when you need to:
 - Add or replace debug headers for local frontend requests.
 - Adjust response headers for CORS, CSP, cache, and iframe debugging.
 - Scope rules by request initiator domain, such as `localhost`.
+- Clone similar rules without carrying over initiator domains.
 - Test WebSocket handshake headers.
 - Share development header rules across machines with Chrome sync.
 

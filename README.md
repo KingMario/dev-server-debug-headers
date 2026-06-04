@@ -29,6 +29,10 @@ Documentation site: <https://mario.studio/dev-server-debug-headers>
   the same header name.
 - `Methods` and `Resource type` are optional filters.
   Use `WebSocket` to target `ws://` and `wss://` handshake requests.
+- Click a rule title to edit it, or use the clone button to copy a rule into
+  the editor while clearing its initiator domains.
+- While the editor is editing or has unsaved user changes, the rules list is
+  disabled to avoid accidental edits against stale UI state.
 - Enable **Chrome sync** in the popup to store the config in
   `chrome.storage.sync`. Cross-device sharing requires Chrome sign-in and sync;
   otherwise Chrome keeps the data in the current profile.

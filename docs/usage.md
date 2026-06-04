@@ -93,6 +93,29 @@ then by normalized initiator domain. Click a rule title to edit it. Use the
 checkbox at the start of a row to enable or disable a rule. Use the red `x` to
 delete a rule.
 
+## Editing and Cloning Rules
+
+The rules list is designed to make each row compact but still keyboard and
+screen-reader friendly:
+
+- Click a rule title to edit the existing rule.
+- Hover a truncated rule title to see the full title in the browser tooltip.
+- Use the checkbox at the start of the row to enable or disable the rule.
+- Use the clone button next to the rule title to copy the rule into the editor.
+- Use the red `x` to delete the rule.
+
+Clone is useful when two rules share the same URL, header name, operation,
+methods, resource type, or request/response direction, but need different
+initiator domains. When cloning, the extension copies every field except
+`Initiator domains`, clears that list, and focuses the initiator domain input.
+Saving the cloned form creates a new rule instead of changing the original.
+
+The editor locks the rules list while it is editing an existing rule or while
+the user has unsaved changes. This avoids accidental toggles, deletes, clones,
+or imports against stale state. Programmatic prefill actions, such as clicking a
+group `+` button or cloning a rule, become the editor's starting state and do
+not count as dirty until the user changes a field.
+
 ## Response Header Rules
 
 Response rules are useful for local experiments where you need to validate how
@@ -203,6 +226,9 @@ already synced rules instead of replacing them with an empty local config.
 - Leave `Methods` as `All` unless the backend behavior differs by method.
 - Use `Resource type = WebSocket` only for WebSocket handshake debugging.
 - Disable a rule instead of deleting it when you expect to reuse it.
+- Clone a rule when the next rule differs mainly by initiator domain. This keeps
+  header details consistent while preventing a copied initiator scope from being
+  reused accidentally.
 - Watch the extension badge. It shows the number of enabled rules matching the
   active tab host.
 - Avoid storing secrets in synced header values. Chrome extension storage is

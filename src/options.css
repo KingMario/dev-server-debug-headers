@@ -164,9 +164,19 @@ p,
   color: var(--link);
 }
 
-.rules-panel[aria-disabled="true"] button.danger-icon:hover {
+.rules-panel[aria-disabled="true"] button.danger-icon:hover,
+.rules-panel[aria-disabled="true"] button.ghost-icon:hover {
   border-color: transparent;
   background: transparent;
+  color: inherit;
+}
+
+.rules-panel[aria-disabled="true"] button.clone-icon:hover {
+  color: var(--muted);
+}
+
+.rules-panel[aria-disabled="true"] button.danger-icon:hover {
+  color: var(--danger);
 }
 
 .switch {
@@ -519,6 +529,27 @@ button.danger-icon {
   border-color: transparent;
   background: transparent;
   color: var(--danger);
+}
+
+button.ghost-icon {
+  border-color: transparent;
+  background: transparent;
+  color: var(--text);
+}
+
+button.ghost-icon:hover {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+button.clone-icon {
+  color: var(--muted);
+}
+
+button.clone-icon:hover {
+  border-color: var(--border);
+  background: transparent;
+  color: var(--text);
 }
 
 button.danger-icon:hover {

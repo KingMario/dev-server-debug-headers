@@ -64,6 +64,7 @@ let settings = await loadSettings();
 let config = await loadConfig(settings.storageArea);
 let currentInitiatorDomains = [];
 let editingRuleTitleToken = 0;
+let editorBaseline = "";
 initializeIconButtons();
 resetForm();
 render();
@@ -107,21 +108,32 @@ elements.syncEnabled.addEventListener("change", async () => {
 
 elements.operation.addEventListener("change", () => {
   elements.headerValue.disabled = elements.operation.value === "remove";
+  syncRulesPanelDisabledState();
 });
 
 for (const input of elements.headerTargetInputs) {
-  input.addEventListener("change", syncHeaderTargetState);
+  input.addEventListener("change", () => {
+    syncHeaderTargetState();
+    syncRulesPanelDisabledState();
+  });
 }
 
 elements.methodAll.addEventListener("change", () => {
   if (elements.methodAll.checked) {
     setCheckedValues("method", []);
   }
+  syncRulesPanelDisabledState();
 });
 
 for (const input of document.querySelectorAll('input[name="method"]')) {
-  input.addEventListener("change", syncMethodAllState);
+  input.addEventListener("change", () => {
+    syncMethodAllState();
+    syncRulesPanelDisabledState();
+  });
 }
+
+elements.form.addEventListener("input", syncRulesPanelDisabledState);
+elements.form.addEventListener("change", syncRulesPanelDisabledState);
 
 elements.methodsFieldset.addEventListener("pointerdown", (event) => {
   if (event.target.closest("input, label")) {
@@ -387,6 +399,8 @@ function startNewRuleForDomains(domains, headerTarget = "request") {
   resetForm();
   setHeaderTarget(headerTarget);
   setInitiatorDomains(domains);
+  resetEditorBaseline();
+  syncRulesPanelDisabledState();
   elements.urlContains.focus();
 }
 
@@ -404,6 +418,7 @@ function createRuleRow(entry) {
   title.className = "rule-title";
   title.dataset.ruleId = entry.id;
   title.textContent = ruleTitle;
+  title.title = ruleTitle;
   title.setAttribute("aria-label", `Edit rule ${ruleTitle}`);
   title.addEventListener("click", () => {
     const titleToken = startEditingRuleTitleTransition();
@@ -416,6 +431,12 @@ function createRuleRow(entry) {
   const controls = document.createElement("div");
   controls.className = "rule-controls";
   controls.append(
+    createIconButton(
+      `Clone rule ${ruleTitle}`,
+      "clone",
+      () => cloneEntry(entry),
+      "ghost-icon clone-icon",
+    ),
     createIconButton(
       `Delete rule ${ruleTitle}`,
       "x",
@@ -664,6 +685,8 @@ function clearEditingRuleTitle() {
 
 function getIconSvg(name) {
   const icons = {
+    clone:
+      '<path fill="currentColor" stroke="none" d="M22.335273 1.090909v20.379273h-2.877818V22.909091H2.181818V3.967636h1.437818V1.090909h18.715636z m-4.556727 4.554545H3.859636v15.585818h13.92V5.645455z m2.876727-2.876727H5.298545v1.198909h14.16l-0.001091 15.823636h1.197818V2.768727z m-5.370545 14.145818v1.678909H6.526909v-1.678909h8.757818z m0-4.315636v1.678909H6.526909v-1.678909h8.757818z m0-4.178182v1.678909H6.526909V8.420727h8.757818z" />',
     download:
       '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="M7 10l5 5 5-5" /><path d="M12 15V3" />',
     plus: '<path d="M12 5v14" /><path d="M5 12h14" />',
@@ -703,8 +726,26 @@ async function deleteEntry(id) {
   render();
 }
 
+function cloneEntry(entry) {
+  resetForm();
+  applyEntryToForm(entry);
+  elements.editingId.value = "";
+  clearEditingRuleTitle();
+  setInitiatorDomains([]);
+  elements.cancelEdit.hidden = false;
+  resetEditorBaseline();
+  syncRulesPanelDisabledState();
+  elements.initiatorDomainInput.focus();
+}
+
 function editEntry(entry) {
   elements.editingId.value = entry.id;
+  applyEntryToForm(entry);
+  elements.cancelEdit.hidden = false;
+  syncRulesPanelDisabledState();
+}
+
+function applyEntryToForm(entry) {
   setHeaderTarget(normalizeHeaderTarget(entry.headerTarget));
   elements.responseHeaderCondition.checked =
     entry.responseHeaderConditionEnabled === true;
@@ -716,10 +757,8 @@ function editEntry(entry) {
   setInitiatorDomains(normalizeInitiatorDomains(entry.initiatorDomains));
   setCheckedValues("method", entry.methods);
   syncMethodAllState();
-  elements.cancelEdit.hidden = false;
   elements.headerValue.disabled = entry.operation === "remove";
   syncHeaderTargetState();
-  syncRulesPanelDisabledState();
 }
 
 function readEntryFromForm() {
@@ -753,6 +792,7 @@ function resetForm() {
   elements.cancelEdit.hidden = true;
   elements.headerValue.disabled = false;
   syncHeaderTargetState();
+  resetEditorBaseline();
   syncRulesPanelDisabledState();
 }
 
@@ -784,13 +824,27 @@ function syncHeaderTargetState() {
 
 function syncRulesPanelDisabledState() {
   const isEditing = Boolean(elements.editingId.value);
-  elements.rulesPanel.setAttribute("aria-disabled", String(isEditing));
+  const isDirty = editorBaseline !== getEditorSnapshot();
+  const shouldDisable = isEditing || isDirty;
+  elements.rulesPanel.setAttribute("aria-disabled", String(shouldDisable));
 
   for (const control of elements.rulesPanel.querySelectorAll(
     "button, input, select, textarea",
   )) {
-    control.disabled = isEditing;
+    control.disabled = shouldDisable;
   }
+}
+
+function resetEditorBaseline() {
+  editorBaseline = getEditorSnapshot();
+}
+
+function getEditorSnapshot() {
+  return JSON.stringify({
+    ...readEntryFromForm(),
+    editingId: elements.editingId.value,
+    pendingInitiatorDomain: elements.initiatorDomainInput.value,
+  });
 }
 
 function getCheckedValues(name) {
@@ -829,12 +883,14 @@ function addInitiatorDomain(value) {
 
   if (addedDomains.length === 0) {
     elements.initiatorDomainInput.value = "";
+    syncRulesPanelDisabledState();
     return false;
   }
 
   currentInitiatorDomains = currentInitiatorDomains.concat(addedDomains);
   elements.initiatorDomainInput.value = "";
   renderInitiatorDomainPills();
+  syncRulesPanelDisabledState();
   return true;
 }
 
@@ -843,6 +899,7 @@ function removeInitiatorDomain(index) {
     (_domain, domainIndex) => domainIndex !== index,
   );
   renderInitiatorDomainPills();
+  syncRulesPanelDisabledState();
 }
 
 function renderInitiatorDomainPills() {
