@@ -76,6 +76,9 @@
                 Only if response already has this header
               </label>
             </fieldset>
+            <p id="response-note" class="field-note" hidden>
+              Response headers are changed after the request reaches the server.
+            </p>
 
             <div class="grid">
               <label>
@@ -144,9 +147,12 @@
                   <input
                     id="initiator-domain-input"
                     name="initiatorDomains"
-                    placeholder="Add domain"
+                    placeholder="Defaults to localhost, 127.0.0.1"
                   />
                 </div>
+                <p id="initiator-domain-note" class="field-note">
+                  Empty uses localhost and 127.0.0.1.
+                </p>
               </div>
             </div>
 
@@ -196,7 +202,12 @@
               <input id="import-file" type="file" accept="application/json" />
             </div>
           </div>
-          <div id="empty-state" class="empty">No header rules yet.</div>
+          <p id="rules-lock-note" class="field-note" hidden>
+            Save or cancel current editor changes to edit rules.
+          </p>
+          <div id="empty-state" class="empty">
+            No rules yet. Create one on the left.
+          </div>
           <ul id="rules" class="rules"></ul>
         </section>
       </div>

@@ -35,6 +35,7 @@ const elements = {
   headerTargetInputs: document.querySelectorAll('input[name="headerTarget"]'),
   responseHeaderCondition: document.querySelector("#response-header-condition"),
   responseConditionField: document.querySelector(".response-condition"),
+  responseNote: document.querySelector("#response-note"),
   urlContains: document.querySelector("#url-contains"),
   headerName: document.querySelector("#header-name"),
   headerValue: document.querySelector("#header-value"),
@@ -44,6 +45,7 @@ const elements = {
   initiatorDomainPills: document.querySelector("#initiator-domain-pills"),
   initiatorDomainList: document.querySelector("#initiator-domain-list"),
   initiatorDomainInput: document.querySelector("#initiator-domain-input"),
+  initiatorDomainNote: document.querySelector("#initiator-domain-note"),
   addCurrentTabDomain: document.querySelector("#add-current-tab-domain"),
   methodsFieldset: document.querySelector("#methods-fieldset"),
   methodAll: document.querySelector("#method-all"),
@@ -52,6 +54,7 @@ const elements = {
   saveRule: document.querySelector("#save-rule"),
   cancelEdit: document.querySelector("#cancel-edit"),
   rulesPanel: document.querySelector(".rules-panel"),
+  rulesLockNote: document.querySelector("#rules-lock-note"),
   rules: document.querySelector("#rules"),
   emptyState: document.querySelector("#empty-state"),
   import: document.querySelector("#import"),
@@ -66,6 +69,7 @@ let config = await loadConfig(settings.storageArea);
 let currentInitiatorDomains = [];
 let editingRuleTitleToken = 0;
 let editorBaseline = "";
+let initiatorDomainNoteTimer = 0;
 initializeIconButtons();
 resetForm();
 await syncCurrentTabDomainButton();
@@ -169,7 +173,7 @@ elements.addCurrentTabDomain.addEventListener("click", async () => {
   flashButtonTitle(
     elements.addCurrentTabDomain,
     added ? `Added ${domain}` : `${domain} already exists`,
-    "Add current tab domain",
+    "Add active page domain",
   );
   elements.initiatorDomainInput.focus();
 });
@@ -496,7 +500,7 @@ function initializeIconButtons() {
   setIconButton(elements.cancelEdit, "Cancel edit", "undo");
   setIconButton(
     elements.addCurrentTabDomain,
-    "Add current tab domain",
+    "Add active page domain",
     "crosshair",
   );
   setIconButton(elements.import, "Import JSON", "upload");
@@ -524,6 +528,24 @@ function flashButtonTitle(button, text, fallbackText) {
   setTimeout(() => {
     button.title = fallbackText;
   }, 1200);
+}
+
+function flashInitiatorDomainNote(text) {
+  clearTimeout(initiatorDomainNoteTimer);
+  elements.initiatorDomainNote.textContent = text;
+  elements.initiatorDomainField.classList.add("is-attention");
+
+  initiatorDomainNoteTimer = setTimeout(() => {
+    resetInitiatorDomainNote();
+  }, 1800);
+}
+
+function resetInitiatorDomainNote() {
+  clearTimeout(initiatorDomainNoteTimer);
+  initiatorDomainNoteTimer = 0;
+  elements.initiatorDomainNote.textContent =
+    "Empty uses localhost and 127.0.0.1.";
+  elements.initiatorDomainField.classList.remove("is-attention");
 }
 
 /**
@@ -787,6 +809,9 @@ function cloneEntry(entry) {
   clearEditingRuleTitle();
   setInitiatorDomains([]);
   elements.cancelEdit.hidden = false;
+  flashInitiatorDomainNote(
+    "Cloned rule. Add an initiator domain or keep defaults.",
+  );
   resetEditorBaseline();
   syncRulesPanelDisabledState();
   elements.initiatorDomainInput.focus();
@@ -845,6 +870,7 @@ function resetForm() {
   elements.methodAll.checked = true;
   elements.cancelEdit.hidden = true;
   elements.headerValue.disabled = false;
+  resetInitiatorDomainNote();
   syncHeaderTargetState();
   resetEditorBaseline();
   syncRulesPanelDisabledState();
@@ -870,6 +896,7 @@ function syncHeaderTargetState() {
   const isResponse = getHeaderTarget() === "response";
   elements.responseConditionField.hidden = !isResponse;
   elements.responseHeaderCondition.disabled = !isResponse;
+  elements.responseNote.hidden = !isResponse;
 
   if (!isResponse) {
     elements.responseHeaderCondition.checked = false;
@@ -880,7 +907,13 @@ function syncRulesPanelDisabledState() {
   const isEditing = Boolean(elements.editingId.value);
   const isDirty = editorBaseline !== getEditorSnapshot();
   const shouldDisable = isEditing || isDirty;
+  const disabledTitle = shouldDisable
+    ? "Save or cancel current editor changes first."
+    : "";
   elements.rulesPanel.setAttribute("aria-disabled", String(shouldDisable));
+  elements.rulesLockNote.hidden = !shouldDisable;
+  elements.import.title = disabledTitle || "Import JSON";
+  elements.export.title = disabledTitle || "Export JSON";
 
   for (const control of elements.rulesPanel.querySelectorAll(
     "button, input, select, textarea",

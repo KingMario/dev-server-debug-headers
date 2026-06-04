@@ -123,6 +123,13 @@ p,
   color: var(--muted);
 }
 
+.field-note {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
 .panel {
   margin-top: 14px;
   padding: 14px;
@@ -321,6 +328,11 @@ select:focus-visible,
 
 .pill-input input:focus {
   outline: none;
+}
+
+.initiator-field.is-attention .pill-input {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 24%, transparent);
 }
 
 button {
