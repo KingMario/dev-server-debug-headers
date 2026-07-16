@@ -25,6 +25,8 @@ Documentation site: <https://mario.studio/dev-server-debug-headers>
   as `chrome://` URLs.
 - The extension badge counts enabled rules whose initiator domains match the
   current tab.
+- `Rule title` is an optional display name for distinguishing similar rules in
+  the rules list.
 - `URL contains` is optional and is matched inside the full request URL.
 - Rules can target request headers or response headers.
 - `Operation` maps to Chrome `declarativeNetRequest.modifyHeaders`.

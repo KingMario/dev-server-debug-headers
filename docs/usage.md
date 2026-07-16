@@ -35,6 +35,7 @@ Each rule describes one header operation:
 
 - `Header direction`: whether the rule modifies request headers or response
   headers.
+- `Rule title`: optional display name used in the rules list.
 - `URL contains`: optional text matched against the full request URL.
 - `Header name`: the request header to modify.
 - `Header value`: the value used by `set` and `append`.
@@ -72,24 +73,26 @@ the request destination is `api.example.com`.
 
 1. Fill in `URL contains` when you want to narrow the match to a path or query
    fragment, such as `/v1/` or `/graphql`.
-2. Choose `Request` or `Response` as the header direction.
-3. Enter a lower-case or mixed-case header name. The extension normalizes header
+2. Enter `Rule title` when several rules share the same host and header but
+   need different visible labels.
+3. Choose `Request` or `Response` as the header direction.
+4. Enter a lower-case or mixed-case header name. The extension normalizes header
    names to lower case when importing or saving through the UI.
-4. Choose an operation:
+5. Choose an operation:
    - `Set or replace`: set the header value or replace an existing value.
    - `Append`: append a value to an existing header when Chrome allows it.
    - `Remove`: remove the header; the value field is ignored.
-5. For response rules, optionally check `Only if response already has this
+6. For response rules, optionally check `Only if response already has this
 header`.
-6. Choose a resource type only when you need one. Leave it as `All` for broad
+7. Choose a resource type only when you need one. Leave it as `All` for broad
    matching.
-7. Add initiator domains. If the list is empty, the extension defaults to
+8. Add initiator domains. If the list is empty, the extension defaults to
    `localhost` and `127.0.0.1`. Use the current-tab button at the end of the
    `Initiator domains` label row to add the active tab's domain. The button is
    shown only when the active tab is a normal `http` or `https` page, and is
    hidden on browser-internal or extension pages.
-8. Choose methods. If `All` is checked, no method filter is emitted.
-9. Click save.
+9. Choose methods. If `All` is checked, no method filter is emitted.
+10. Click save.
 
 Rules appear in the right panel grouped first by request/response direction and
 then by normalized initiator domain. Click a rule title to edit it. Use the

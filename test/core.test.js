@@ -60,6 +60,7 @@ describe("settings and imported config normalization", () => {
         entries: [
           {
             enabled: false,
+            title: " Prefer core on CAD v2 ",
             urlContains: " /v1/ ",
             headerName: " X-Debug-User ",
             headerValue: "alice",
@@ -79,6 +80,7 @@ describe("settings and imported config normalization", () => {
         {
           id: "generated-id",
           enabled: false,
+          title: "Prefer core on CAD v2",
           urlContains: "/v1/",
           headerName: "x-debug-user",
           headerValue: "",
@@ -129,6 +131,7 @@ describe("settings and imported config normalization", () => {
       {
         id: "response-id",
         enabled: true,
+        title: "",
         urlContains: "",
         headerName: "x",
         headerValue: "",
@@ -221,6 +224,11 @@ describe("domain and grouping helpers", () => {
 describe("rule title and DOM target helpers", () => {
   it("creates stable compact rule titles", () => {
     assert.equal(createRuleTitle(baseEntry), "SET x-debug");
+    assert.equal(
+      createRuleTitle({ ...baseEntry, title: "CAD v2 prefer-core" }),
+      "CAD v2 prefer-core",
+    );
+    assert.equal(createRuleTitle({ ...baseEntry, title: " " }), "SET x-debug");
   });
 
   it("finds save animation targets by id instead of title text", () => {

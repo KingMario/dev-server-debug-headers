@@ -36,6 +36,7 @@ const elements = {
   responseHeaderCondition: document.querySelector("#response-header-condition"),
   responseConditionField: document.querySelector(".response-condition"),
   responseNote: document.querySelector("#response-note"),
+  ruleTitle: document.querySelector("#rule-title"),
   urlContains: document.querySelector("#url-contains"),
   headerName: document.querySelector("#header-name"),
   headerValue: document.querySelector("#header-value"),
@@ -828,6 +829,7 @@ function applyEntryToForm(entry) {
   setHeaderTarget(normalizeHeaderTarget(entry.headerTarget));
   elements.responseHeaderCondition.checked =
     entry.responseHeaderConditionEnabled === true;
+  elements.ruleTitle.value = entry.title || "";
   elements.urlContains.value = entry.urlContains;
   elements.headerName.value = entry.headerName;
   elements.headerValue.value = entry.headerValue;
@@ -844,6 +846,7 @@ function readEntryFromForm() {
   const operation = elements.operation.value;
   const headerTarget = getHeaderTarget();
   return {
+    title: elements.ruleTitle.value.trim(),
     urlContains: elements.urlContains.value.trim(),
     headerName: elements.headerName.value.trim().toLowerCase(),
     headerValue: operation === "remove" ? "" : elements.headerValue.value,

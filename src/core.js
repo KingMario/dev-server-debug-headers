@@ -15,6 +15,7 @@ export const HEADER_TARGETS = ["request", "response"];
  * @typedef {Object} RuleEntry
  * @property {string} id
  * @property {boolean} enabled
+ * @property {string} title
  * @property {string} urlContains
  * @property {string} headerName
  * @property {string} headerValue
@@ -85,6 +86,7 @@ export function normalizeImportedEntry(
   return {
     id: entry?.id || createId(),
     enabled: entry?.enabled !== false,
+    title: String(entry?.title || "").trim(),
     urlContains: String(entry?.urlContains || "").trim(),
     headerName: String(entry?.headerName || "")
       .trim()
@@ -135,10 +137,14 @@ export function groupEntriesByInitiatorDomains(entries) {
 }
 
 /**
- * @param {Pick<RuleEntry, "operation" | "headerName">} entry
+ * @param {Pick<RuleEntry, "title" | "operation" | "headerName">} entry
  * @returns {string}
  */
 export function createRuleTitle(entry) {
+  if (entry.title?.trim()) {
+    return entry.title.trim();
+  }
+
   return `${entry.operation.toUpperCase()} ${entry.headerName}`;
 }
 
